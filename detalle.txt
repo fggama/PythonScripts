@@ -1,0 +1,10 @@
+#Directorio Origen, Directorio Destino disco actual
+#colocar un archivo .caignore para ignorar ese directorio
+G:\Documents\EPSAS,Documents\EPSAS
+G:\Documents\Visual Studio 2015\Projects,Documents\Visual Studio 2015
+G:\Documents\Seguridad,Documents\Seguridad
+G:\AndroidStudioProjects,AndroidStudioProjects
+C:\Users\garciafr.EPSAS\source\repos,repos
+C:\Users\garciafr.EPSAS\Documents\VS Proyectos,VS Proyectos
+C:\Users\garciafr.EPSAS\Documents\Red,Documents\Red
+C:\Users\garciafr.EPSAS\Documents\Visual Studio 2019,Visual Studio 2019

@@ -1,3 +1,4 @@
+import getopt
 import sys
 import os
 import hashlib
@@ -9,6 +10,7 @@ import subprocess, time
 
 timestampStr = datetime.now().strftime("%Y-%m-%d_%H-%M")
 archivoActual = ""
+versionZIP = 1
 
 def ejecuta(dir_path, origen, destino):
     """Ejecuta la copia: origen -> destino"""
@@ -34,20 +36,20 @@ def ejecuta(dir_path, origen, destino):
         setArchivoActual(os.path.join(dir_destino,"ignore.txt"))
         ignore=open(os.path.join(dir_destino,"ignore.txt"),'w')
 
-        for (path,dirs,files) in os.walk(dir_origen):
-            if not os.path.exists(os.path.join(path,".caignore")):
+        for (root,dirs,files) in os.walk(dir_origen):
+            if not os.path.exists(os.path.join(root,".caignore")):
                 for archivo in files:
                     cont += 1
-                    progreso(num,cont,os.path.join(path,archivo))
-                    setArchivoActual(os.path.join(path,archivo))
-                    f_temp = open(os.path.join(path,archivo),'rb')
+                    progreso(num,cont,os.path.join(root,archivo))
+                    setArchivoActual(os.path.join(root,archivo))
+                    f_temp = open(os.path.join(root,archivo),'rb')
                     content=f_temp.read()
                     m = hashlib.md5()
                     m.update(content)
-                    dict[os.path.join(path,archivo)] = m.hexdigest()
+                    dict[os.path.join(root,archivo)] = m.hexdigest()
                     f_temp.close()
             else:
-                ignore.write(path)
+                ignore.write(root)
                 ignore.write('\n')
 
         if cont < num:
@@ -56,18 +58,20 @@ def ejecuta(dir_path, origen, destino):
         cPickle.dump(dict,checksum)
         checksum.close()
         ignore.close()
-        delta=zipfile.ZipFile(os.path.join(dir_destino,"delta.zip"),'w')
+        delta = zipfile.ZipFile(os.path.join(dir_destino,"delta.zip"),'w')
   
+        # Escribe archivo ZIP
         cont = 0
-        for (path,dirs,files) in os.walk(dir_origen):
+        for (root,dirs,files) in os.walk(dir_origen):
             for archivo in files:
                 cont += 1
-                progreso(num,cont,os.path.join(path,archivo))
+                progreso(num,cont,os.path.join(root,archivo))
                 zipZero = False
                 setArchivoActual("delta:" + os.path.join(dir_destino,"delta.zip"))
-                delta.write(os.path.join(path,archivo))
+                delta.write(os.path.join(root,archivo), os.path.join(setDir(root,dir_origen),archivo))
         delta.close()
   
+        # Registro de archivos borrados
         setArchivoActual(os.path.join(dir_destino,"remove.txt"))
         remove = open(os.path.join(dir_destino,"remove.txt"),'w')
         for k, v in list(dict.items()):
@@ -83,6 +87,7 @@ def ejecuta(dir_path, origen, destino):
             renombraArchivo(dir_destino,timestampStr)
         return
 
+    # Registro de archivos borrados
     setArchivoActual(os.path.join(dir_destino,"remove.txt"))
     remove = open(os.path.join(dir_destino,"remove.txt"),'w')
     for k, v in list(dict.items()):
@@ -92,35 +97,37 @@ def ejecuta(dir_path, origen, destino):
             del dict[k]
     remove.close()
 
+    # Escribe archivo ZIP
+    # Registro de archivos ignorados
     setArchivoActual(os.path.join(dir_destino,"ignore.txt"))
     ignore = open(os.path.join(dir_destino,"ignore.txt"),'w')
     delta = zipfile.ZipFile(os.path.join(dir_destino,"delta.zip"),'w')
     num = sum([len(files) for r, d, files in os.walk(dir_origen)])
     cont = 0
-    for (path,dirs,files) in os.walk(dir_origen):
-        if not os.path.exists(os.path.join(path,".caignore")):
+    for (root,dirs,files) in os.walk(dir_origen):
+        if not os.path.exists(os.path.join(root,".caignore")):
             for archivo in files:
                 cont += 1
-                progreso(num,cont,os.path.join(path,archivo))
-                setArchivoActual(os.path.join(path,archivo))
-                f_temp = open(os.path.join(path,archivo),'rb')
+                progreso(num,cont,os.path.join(root,archivo))
+                setArchivoActual(os.path.join(root,archivo))
+                f_temp = open(os.path.join(root,archivo),'rb')
                 content = f_temp.read()
                 m = hashlib.md5()
                 m.update(content)
                 f_temp.close()
                 try:
-                    if(dict[os.path.join(path,archivo)] != m.hexdigest()):
+                    if(dict[os.path.join(root,archivo)] != m.hexdigest()):
                         zipZero = False
                         setArchivoActual("delta:" + os.path.join(dir_destino,"delta.zip"))
-                        delta.write(os.path.join(path,archivo))
-                        dict[os.path.join(path,archivo)] = m.hexdigest()
+                        delta.write(os.path.join(root,archivo), os.path.join(setDir(root,dir_origen),archivo))
+                        dict[os.path.join(root,archivo)] = m.hexdigest()
                 except KeyError:
                     zipZero = False
                     setArchivoActual("delta:" + os.path.join(dir_destino,"delta.zip"))
-                    delta.write(os.path.join(path,archivo))
-                    dict[os.path.join(path,archivo)] = m.hexdigest()
+                    delta.write(os.path.join(root,archivo), os.path.join(setDir(root,dir_origen),archivo))
+                    dict[os.path.join(root,archivo)] = m.hexdigest()
         else:
-            ignore.write(path)
+            ignore.write(root)
             ignore.write('\n')
     
     if cont < num:
@@ -137,6 +144,11 @@ def ejecuta(dir_path, origen, destino):
     else:
         renombraArchivo(dir_destino,timestampStr)
 
+def setDir(root, dir_origen):
+    if versionZIP == 1:
+        return root.replace(str(dir_origen),"")
+    else:
+        return root
 
 def renombraArchivo(dir_destino, timestampStr):
     """Renombra el archivo delta.zip al archivo de la fecha"""
@@ -175,16 +187,44 @@ def setArchivoActual(nombre):
     global archivoActual
     archivoActual = nombre
 
-def main():
+def main(argv):
+    archiDetalle = ""
+    global versionZIP
+    versionZIP = 0
+
+    try:
+        print (argv)
+        opts, args = getopt.getopt(argv,"h2d:")
+    except getopt.GetoptError:
+        print ('Error:')
+        print ('  usar: CopiaArchivos.py -d <archivo de detalle> -2 -h')
+        print ('  ej:   CopiaArchivos.py -d detalle.txt')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print ('  usar: CopiaArchivos.py -d <archivo de detalle> -2 -h')
+            print ('  ej:   CopiaArchivos.py -d detalle.txt' -2)
+            sys.exit()
+        elif opt in ("-d"):
+            archiDetalle = arg
+        elif opt in ("-2"):
+            versionZIP = 1
+
+    if len(archiDetalle) == 0:
+        print ('Error:')
+        print ('  usar: CopiaArchivos.py -d <archivo de detalle> -2 -h')
+        print ('  ej:   CopiaArchivos.py -d detalle.txt')
+        sys.exit(2)
+        
     origen = ""
     destino = ""
     try:
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        if not os.path.exists(os.path.join(dir_path,"detalle.txt")):
-            raise Exception('No se encuentra el archivo detalle.txt')
+        if not os.path.exists(os.path.join(dir_path,archiDetalle)):
+            raise Exception('No se encuentra el archivo ' + archiDetalle)
     
-        setArchivoActual(os.path.join(dir_path,"detalle.txt"))
-        f_temp=open(os.path.join(dir_path,"detalle.txt"),'r')
+        setArchivoActual(os.path.join(dir_path,archiDetalle))
+        f_temp=open(os.path.join(dir_path,archiDetalle),'r')
         detalle = f_temp.readlines()
         for linea in detalle:
             if len(linea) == 0 or linea.startswith("#"):
@@ -212,5 +252,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
 

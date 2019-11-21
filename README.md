@@ -9,7 +9,7 @@
 ```
 CopiaArchivos.py -d "archivo de detalle" -2 -h
 ```
-_-2 crea archivos zip con el path relativo
+-2 crea archivos zip con el path relativo
 
 -h ayuda
 
@@ -23,7 +23,7 @@ RestauraArchivos.py -o "restaurar desde" -d "restaurar a" -x "extraer el direcor
 ```
 BuscaArchivos.py -o "buscar en" -b "direcorio o archivo" -s
 ```
-_-s -> (opcional) desplegar sin paginacion
+_-s -> (opcional) desplegar sin paginacion_
 
 -h ayuda
   

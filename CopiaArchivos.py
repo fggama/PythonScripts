@@ -187,23 +187,30 @@ def setArchivoActual(nombre):
     global archivoActual
     archivoActual = nombre
 
+def printInstrucciones():
+     print ('\tusar: CopiaArchivos.py -d <archivo de detalle> -2')
+     print ('\t\tRealiza la copia y compresión (archivos ZIP) en forma "incremental", de los directorios especificados en')
+     print ('\t\tel archivo de "detalle" con el formato: "directorio_origen, drectorio_destino_disco_actual",')
+     print ('\t\tpara ignorar la copia de un directorio se debe crear un archivo de texto vacio con el nombre ".caignore"')
+     print ('\n\t\t-h\tAyuda')
+     print ('\t\t-d\tArchivo de detalle, donde se especifica los directorios Origen y Destino de la copia')
+     print ('\t\t-2\t(Opcional) Utilizar rutas relativas, no absolutas en el archivo ZIP')
+     print ('  ej:   CopiaArchivos.py -d detalle.txt -2')
+
 def main(argv):
     archiDetalle = ""
     global versionZIP
     versionZIP = 0
 
     try:
-        print (argv)
         opts, args = getopt.getopt(argv,"h2d:")
     except getopt.GetoptError:
         print ('Error:')
-        print ('  usar: CopiaArchivos.py -d <archivo de detalle> -2 -h')
-        print ('  ej:   CopiaArchivos.py -d detalle.txt')
+        printInstrucciones()
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print ('  usar: CopiaArchivos.py -d <archivo de detalle> -2 -h')
-            print ('  ej:   CopiaArchivos.py -d detalle.txt' -2)
+            printInstrucciones()
             sys.exit()
         elif opt in ("-d"):
             archiDetalle = arg
@@ -211,9 +218,7 @@ def main(argv):
             versionZIP = 1
 
     if len(archiDetalle) == 0:
-        print ('Error:')
-        print ('  usar: CopiaArchivos.py -d <archivo de detalle> -2 -h')
-        print ('  ej:   CopiaArchivos.py -d detalle.txt')
+        printInstrucciones()
         sys.exit(2)
         
     origen = ""

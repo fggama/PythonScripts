@@ -1,5 +1,5 @@
 # PythonScripts
-> Algunos scripts Python, los utilizo todos los días
+> Algunos scripts Python para realizar copias de seguridad incrementales en Windows, los utilizo todos los días
 
 * Backup Incremental de Archivos (CopiaArchivos.py)
 * Restaura archivos desde la estructura del Backup Incremental (RestauraArchivos.py)

@@ -1,32 +1,22 @@
-# PythonScripts
-> Algunos scripts Python para realizar copias de seguridad incrementales en Windows, los utilizo todos los días
+# Notas y Python Scripts
+> Programas y scripts en Python, de uso diario y ejemplos utiles
 
+## Copias incrementales
 * Backup Incremental de Archivos (CopiaArchivos.py)
 * Restaura archivos desde la estructura del Backup Incremental (RestauraArchivos.py)
 * Busca archivos en los archivos de Backup (BuscaArchivos.py)
+* Archivo de detalle de ejemplo (detalle.txt)
 
-## CopiaArchivos.py
+## dataframes.py
 ```
-CopiaArchivos.py -d "archivo de detalle" -2 -h
+Pandas DataFrames, ejemplos de manipulación de datos
 ```
-_-2 crea archivos zip con el path relativo_
 
-_-h ayuda_
-
-## RestauraArchivos.py
+## for.py
 ```
-RestauraArchivos.py -o "restaurar desde" -d "restaurar a" -x "extraer el direcorio o archivo"'
+Resumen y ejemplos de iteradores
 ```
-_-h ayuda_
-
-## BuscaArchivos.py
-```
-BuscaArchivos.py -o "buscar en" -b "direcorio o archivo" -s
-```
-_-s (opcional) desplegar sin paginacion_
-
-_-h ayuda_
-  
+ 
 ---
 ### Meta
 

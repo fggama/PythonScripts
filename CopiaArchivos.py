@@ -7,142 +7,103 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 import subprocess, time
+import glob
+from msvcrt import getch
 
 timestampStr = datetime.now().strftime("%Y-%m-%d_%H-%M")
 archivoActual = ""
-versionZIP = 1
+versionZIP = 0
+infoExt = False
+key = 0
+paginar = True
 
-def ejecuta(dir_path, origen, destino):
+def copiar(origen,destino,directorios):
     """Ejecuta la copia: origen -> destino"""
     dict={}
-    dir_origen = Path(origen)
-    dir_destino = os.path.join(Path(dir_path), Path(destino))
-    print(origen + '->' + dir_destino)
+
+    destino.mkdir(parents=True, exist_ok=True)
+    print(f'{origen}->{destino.absolute()}')
     zipZero = True
-    os.chdir(dir_origen)
+ 
+    os.chdir(destino)
 
-    try:
-        chksm = os.path.join(dir_destino,"chksm.txt")
-        if os.path.getsize(chksm) > 0:
-            setArchivoActual(chksm)
-            checksum = open(chksm,'rb')
+    # Archivo de Check Sum
+    chksm = Path.cwd() / "chksm.txt"
+    setArchivoActual(chksm)
+    if chksm.exists() and os.path.getsize(chksm) > 0:
+        with open(chksm,mode='rb') as checksum:
             dict = cPickle.load(checksum)
-            checksum.close()
-    except IOError:
-        num = sum([len(files) for r, d, files in os.walk(dir_origen)])
-        cont = 0
-        setArchivoActual(os.path.join(dir_destino,"chksm.txt"))
-        checksum=open(os.path.join(dir_destino,"chksm.txt"),'wb')
-        setArchivoActual(os.path.join(dir_destino,"ignore.txt"))
-        ignore=open(os.path.join(dir_destino,"ignore.txt"),'w')
-
-        for (root,dirs,files) in os.walk(dir_origen):
-            if not os.path.exists(os.path.join(root,".caignore")):
-                for archivo in files:
-                    cont += 1
-                    progreso(num,cont,os.path.join(root,archivo))
-                    setArchivoActual(os.path.join(root,archivo))
-                    f_temp = open(os.path.join(root,archivo),'rb')
-                    content=f_temp.read()
-                    m = hashlib.md5()
-                    m.update(content)
-                    dict[os.path.join(root,archivo)] = m.hexdigest()
-                    f_temp.close()
-            else:
-                ignore.write(root)
-                ignore.write('\n')
-
-        if cont < num:
-            progreso(num,num,'')
-
-        cPickle.dump(dict,checksum)
-        checksum.close()
-        ignore.close()
-        delta = zipfile.ZipFile(os.path.join(dir_destino,"delta.zip"),'w')
-  
-        # Escribe archivo ZIP
-        cont = 0
-        for (root,dirs,files) in os.walk(dir_origen):
-            for archivo in files:
-                cont += 1
-                progreso(num,cont,os.path.join(root,archivo))
-                zipZero = False
-                setArchivoActual("delta:" + os.path.join(dir_destino,"delta.zip"))
-                delta.write(os.path.join(root,archivo), os.path.join(setDir(root,dir_origen),archivo))
-        delta.close()
-  
-        # Registro de archivos borrados
-        setArchivoActual(os.path.join(dir_destino,"remove.txt"))
-        remove = open(os.path.join(dir_destino,"remove.txt"),'w')
-        for k, v in list(dict.items()):
-            if(not os.path.exists(k)):
-                remove.write(k)
-                remove.write('\n')
-                del dict[k]
-        remove.close()
-
-        if zipZero:
-            os.remove(os.path.join(dir_destino,"delta.zip"))
-        else:
-            renombraArchivo(dir_destino,timestampStr)
-        return
 
     # Registro de archivos borrados
-    setArchivoActual(os.path.join(dir_destino,"remove.txt"))
-    remove = open(os.path.join(dir_destino,"remove.txt"),'w')
-    for k, v in list(dict.items()):
-        if(not os.path.exists(k)):
-            remove.write(k)
-            remove.write('\n')
-            del dict[k]
-    remove.close()
+    setArchivoActual(destino / "remove.txt")
+    remove = Path("remove.txt")
+    with remove.open(mode='w') as rem:
+        for k, v in list(dict.items()):
+            if(not os.path.exists(k)):
+                try:
+                    rem.write(f'{k}\n')
+                except:
+                    print(f'{k}\n')
+
+                del dict[k]
 
     # Escribe archivo ZIP
     # Registro de archivos ignorados
-    setArchivoActual(os.path.join(dir_destino,"ignore.txt"))
-    ignore = open(os.path.join(dir_destino,"ignore.txt"),'w')
-    delta = zipfile.ZipFile(os.path.join(dir_destino,"delta.zip"),'w')
-    num = sum([len(files) for r, d, files in os.walk(dir_origen)])
+    setArchivoActual(f"ignore:{destino / 'ignore.txt'}")
+    ign = Path("ignore.txt")
+    ignore = open(ign, mode='w')
+    delta = zipfile.ZipFile(Path("delta.zip"), 'w')
+    num = sum([len(files) for r, d, files in os.walk(origen)])
     cont = 0
-    for (root,dirs,files) in os.walk(dir_origen):
-        if not os.path.exists(os.path.join(root,".caignore")):
-            for archivo in files:
-                cont += 1
-                progreso(num,cont,os.path.join(root,archivo))
-                setArchivoActual(os.path.join(root,archivo))
-                f_temp = open(os.path.join(root,archivo),'rb')
-                content = f_temp.read()
-                m = hashlib.md5()
-                m.update(content)
-                f_temp.close()
-                try:
-                    if(dict[os.path.join(root,archivo)] != m.hexdigest()):
-                        zipZero = False
-                        setArchivoActual("delta:" + os.path.join(dir_destino,"delta.zip"))
-                        delta.write(os.path.join(root,archivo), os.path.join(setDir(root,dir_origen),archivo))
-                        dict[os.path.join(root,archivo)] = m.hexdigest()
-                except KeyError:
+    copiados = 0
+    for (root,dirs,files) in os.walk(origen):
+        if os.path.dirname(root) == os.path.dirname(origen):
+            dirs[:] = [d for d in dirs if d not in directorios]
+        for archivo in files:
+            cont += 1
+            archParaZip = Path(root) / Path(archivo)
+            progreso(num,cont,archParaZip)
+            setArchivoActual(archParaZip)
+            f_temp = open(archParaZip,'rb')
+            content = f_temp.read()
+            m = hashlib.md5()
+            m.update(content)
+            f_temp.close()
+            setArchivoActual(f"delta:{delta.filename}")
+            
+            try:
+                if(dict[archParaZip] != m.hexdigest()):
                     zipZero = False
-                    setArchivoActual("delta:" + os.path.join(dir_destino,"delta.zip"))
-                    delta.write(os.path.join(root,archivo), os.path.join(setDir(root,dir_origen),archivo))
-                    dict[os.path.join(root,archivo)] = m.hexdigest()
-        else:
-            ignore.write(root)
-            ignore.write('\n')
+                    delta.write(archParaZip, os.path.join(setDir(root,origen),archivo))
+                    dict[archParaZip] = m.hexdigest()
+                    copiados += 1
+                else:
+                    ignore.write(f'{str(archParaZip)}\n')
+
+            except KeyError:
+                zipZero = False
+                delta.write(archParaZip, os.path.join(setDir(root,origen),archivo))
+                dict[archParaZip] = m.hexdigest()
+                copiados += 1
     
-    if cont < num:
-        progreso(num,num,'')
     delta.close()
     ignore.close()
+    setArchivoActual(os.path.join(destino,"chksm.txt"))
+    with  open("chksm.txt",mode='wb') as checksum:
+        cPickle.dump(dict,checksum)
 
-    setArchivoActual(os.path.join(dir_destino,"chksm.txt"))
-    f=open(os.path.join(dir_destino,"chksm.txt"),'wb')
-    cPickle.dump(dict,f)
-    f.close()
+    if cont < num and cont > 0:
+        progreso(num,num,'')
+    print(f"# archivos copiados: {copiados}\n")
+    
+    deltazip = Path("delta.zip")
     if zipZero:
-        os.remove(os.path.join(dir_destino,"delta.zip"))
+        try:
+            deltazip.unlink()
+        except:
+            pass
     else:
-        renombraArchivo(dir_destino,timestampStr)
+        deltazip.rename(Path(f"{timestampStr}.zip"))
 
 def setDir(root, dir_origen):
     if versionZIP == 1:
@@ -150,60 +111,122 @@ def setDir(root, dir_origen):
     else:
         return root
 
-def renombraArchivo(dir_destino, timestampStr):
-    """Renombra el archivo delta.zip al archivo de la fecha"""
-    if os.path.exists(os.path.join(dir_destino,"delta.zip")):
-        os.rename(os.path.join(dir_destino,"delta.zip"),os.path.join(dir_destino,timestampStr + ".zip"))
-
-
-def directorioDestino(path):
-    """Verifica la existencia y crea los directorios destino"""
-    if not os.path.exists(path):
-        try:
-            os.makedirs(path)
-            print("+ directorio " + path)
-        except:
-            print("")
-            print(path + "--> Error destino: ", sys.exc_info())
-
 def progreso(total, i, archivo):
-    """Despliega el progreso de la ejecució"""
-    incre = int(50.0 / total * i)
-    espacios = 100 - len(archivo)
-    if espacios < 0:
-        espacios = 0
-        archivo = archivo[:100]
+    """Despliega el progreso de la ejecución"""
+    try:
+        incre = int(50.0 / total * i)
+        nombre = str(archivo)
+        espacios = 100 - len(nombre)
+        if espacios < 0:
+            espacios = 0
+            nombre = nombre[:100]
 
-    if i < total:
-        sys.stdout.write('\r' + '| %d%%  |%s' % (2*incre,' '*5 + archivo + ' '*espacios))
-    else:
-        sys.stdout.write('\r' + '|%d%%  |%s' % (100,' '*5 + 'Finalizado' + ' '*90))
-        sys.stdout.write('\n')
-        print(total)
+        if i < total:
+            sys.stdout.write('\r' + '| %d%%  |%s' % (2*incre,' '*5 + nombre + ' '*espacios))
+        else:
+            sys.stdout.write('\r' + '|%d%%  |%s' % (100,' '*5 + 'Finalizado' + ' '*90))
+            sys.stdout.write('\n')
+            print(f'# archivos procesados: {total}')
+    except:
+        print("Info:", sys.exc_info())
+        
     sys.stdout.flush()
 
 def setArchivoActual(nombre):
     """Registra el nombre del archivo en proceso"""
-    global archivoActual
+    global archivoActual     
     archivoActual = nombre
 
+def listaArchivos(destino, nivel):
+    global key
+    global numArchivos
+    global paginar
+    cont = 0
+    columnas, filas = get_windows_terminal()
+    dirname = ''
+    zipArchivos = Path(destino).glob("*.zip")
+
+    for zipArchivo in [x for x in zipArchivos if x.is_file()]:
+        print(f"Archivo: {zipArchivo}")
+        with zipfile.ZipFile(zipArchivo) as esteZip:
+            dict = {}
+            for name in esteZip.namelist():
+                i = 0
+                for h in range(0,nivel):
+                    i = name.find('/',i)
+                    if i >= 0:
+                        dirname = name[0:i+1]
+                        if dirname not in dict:
+                            dict[dirname] = dirname
+                            print ('\t'*h + f'\t{dirname}')
+                            cont += 1
+                        i += 1
+                    else:
+                        break
+
+                c = name.count("/")
+                if c < nivel:
+                    info = esteZip.getinfo(name)
+                    namefile = info.filename.replace(dirname,'')
+                    print ('\t'*h + f'\t{namefile}')
+                    cont += 1
+                    if infoExt:
+                        #print ('\t'*h + '\t\tComment:\t', info.comment)
+                        print ('\t'*h + '\t\tModified:\t', datetime(*info.date_time))
+                        #print ('\t'*h + '\t\tSystem:\t\t', info.create_system, '(0 = Windows, 3 = Unix)')
+                        print ('\t'*h + '\t\tZIP version:\t', info.create_version)
+                        print ('\t'*h + '\t\tCompressed:\t', info.compress_size, 'bytes')
+                        print ('\t'*h + '\t\tUncompressed:\t', info.file_size, 'bytes')
+                        cont += 6
+
+                if paginar and cont >= filas - 1:
+                    cont = 1
+                    print("presione una tecla para continuar, ESC para salir, C continuar sin paginacion...")
+                    key = ord(getch())
+                    if key == 67 or key == 99:
+                        paginar = False
+                    if key == 27:
+                        break
+        if key == 27:
+            break
+
+def get_windows_terminal():
+    from ctypes import windll, create_string_buffer
+    h = windll.kernel32.GetStdHandle(-12)
+    csbi = create_string_buffer(22)
+    res = windll.kernel32.GetConsoleScreenBufferInfo(h, csbi)
+ 
+    if not res: return 80, 25 
+ 
+    import struct
+    (bufx, bufy, curx, cury, wattr, left, top, right, bottom, maxx, maxy)\
+    = struct.unpack("hhhhHhhhhhh", csbi.raw)
+    width = right - left + 1
+    height = bottom - top + 1
+ 
+    return width, height
+
 def printInstrucciones():
-     print ('\tusar: CopiaArchivos.py -d <archivo de detalle> -2')
+     print ('\tusar: CopiaArchivos.py -d <archivo de detalle> [-a] [-l <nivel>]')
      print ('\t\tRealiza la copia y compresión (archivos ZIP) en forma "incremental", de los directorios especificados en')
      print ('\t\tel archivo de "detalle" con el formato: "directorio_origen, drectorio_destino_disco_actual",')
      print ('\t\tpara ignorar la copia de un directorio se debe crear un archivo de texto vacio con el nombre ".caignore"')
      print ('\n\t\t-h\tAyuda')
      print ('\t\t-d\tArchivo de detalle, donde se especifica los directorios Origen y Destino de la copia')
-     print ('\t\t-2\t(Opcional) Utilizar rutas relativas, no absolutas en el archivo ZIP')
-     print ('  ej:   CopiaArchivos.py -d detalle.txt -2')
+     print ('\t\t-l\tListar los elementos copiados, hasta el nivel especificado')
+     print ('\t\t-i\tListar con informacion extendida')
+     print ('\t\t-a\tUtilizar rutas absolutas en el archivo ZIP')
+     print ('  ej:   CopiaArchivos.py -d detalle.txt [-a] [-l <nivel>]')
 
 def main(argv):
     archiDetalle = ""
+    nivel = ""
+    
     global versionZIP
-    versionZIP = 0
+    global infoExt
 
     try:
-        opts, args = getopt.getopt(argv,"h2d:")
+        opts, args = getopt.getopt(argv,"haid:l:")
     except getopt.GetoptError:
         print ('Error:')
         printInstrucciones()
@@ -214,8 +237,12 @@ def main(argv):
             sys.exit()
         elif opt in ("-d"):
             archiDetalle = arg
-        elif opt in ("-2"):
-            versionZIP = 1
+        elif opt in ("-a"):
+            versionZIP = 0
+        elif opt in ("-i"):
+            infoExt = True
+        elif opt in ("-l"):
+            nivel = arg
 
     if len(archiDetalle) == 0:
         printInstrucciones()
@@ -224,35 +251,48 @@ def main(argv):
     origen = ""
     destino = ""
     try:
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        if not os.path.exists(os.path.join(dir_path,archiDetalle)):
-            raise Exception('No se encuentra el archivo ' + archiDetalle)
+        raizBackup = Path(Path.cwd())
+        print(f"\nDirectorio actual: {Path.cwd()}\n")
+        if not Path(archiDetalle).exists():
+            raise Exception(f'No se encuentra el archivo {archiDetalle}')
     
-        setArchivoActual(os.path.join(dir_path,archiDetalle))
-        f_temp=open(os.path.join(dir_path,archiDetalle),'r')
-        detalle = f_temp.readlines()
-        for linea in detalle:
-            if len(linea) == 0 or linea.startswith("#"):
+        archiDetalle = Path(archiDetalle)
+        setArchivoActual(archiDetalle)
+        detalle = Path(archiDetalle).read_text()
+        for linea in detalle.split('\n'):
+            if len(linea) <= 1 or linea.startswith("#") or ',' not in linea:
                 continue
-        
+    
             dirs = linea.replace('/','\\').rstrip().split(",")
-            destino = os.path.join(Path(dir_path), Path(dirs[1]))
-            origen = dirs[0]
-            directorioDestino(os.path.join(Path(dir_path), Path(dirs[1])))
+            if (len(dirs) < 2):
+                continue
+  
+            origen = Path(dirs[0])
+            dirs.pop(0)
+            destino = Path(dirs[0])
+            dirs.pop(0)
 
-            if not os.path.isdir(dirs[0]):
-                print("No existe el directorio origen: " + dirs[0])
+        
+            if len(nivel) > 0:
+                listaArchivos(destino, int(nivel))
+                if key == 27:
+                    break
             else:
-                ejecuta(dir_path, dirs[0], dirs[1])
+                if not origen.is_dir():
+                    print(f"No existe el directorio origen: {origen} (ignorado)")
+                else:
+                    copiar(origen,destino,dirs)
 
-        f_temp.close()
-        print("Finalizado")
+            os.chdir(raizBackup)
+
+        if len(nivel) == 0:
+            print("Copia Finalizada!")
     except:
         print("")
         print("Detalle del proceso ")
-        print("   origen: " + origen)
-        print("  destino: " + destino)
-        print("  archivo: " + archivoActual)
+        print(f"   origen: {origen}")
+        print(f"  destino: {destino}")
+        print(f"  archivo: {archivoActual}")
         print("Info:", sys.exc_info())
 
 

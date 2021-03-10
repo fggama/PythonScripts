@@ -7,8 +7,13 @@ from pathlib import Path
 import subprocess, time
 from msvcrt import getch
 
+numArchivos = 0
+numZip = 0
+z = 0
+paginar = True
+
 def isZip(variable): 
-    if ('.zip' in variable): 
+    if ('.zip' in variable.lower()): 
         return True
     else: 
         return False
@@ -37,12 +42,46 @@ def printInstrucciones():
      print ('\t\t-s\t(Opcional) Desplegar sin paginacion')
      print ('  ej:   BuscaArchivos.py -o "I:/Backup/Documents/Visual Studio 2015" -b "/Projects/SAGA"')
 
+def listaArchivos(buscar,ubic):
+    global z
+    global numArchivos 
+    global numZip 
+    global paginar
+    columnas, filas = get_windows_terminal()
+
+    archBuscar = sorted(os.listdir( os.path.join(ubic) ))
+    zipArchivos = filter(isZip,archBuscar)
+    for zipArchivo in zipArchivos:
+        cont = 0
+        numZip += 1
+        with zipfile.ZipFile(os.path.join(os.path.join(ubic),zipArchivo)) as esteZip:
+            for archivo in esteZip.filelist:
+                if buscar.lower() in archivo.filename.lower():
+                    numArchivos += 1
+                    cont += 1
+                    if paginar and cont == filas - 1:
+                        cont = 1
+                        print("presione una tecla para continuar, ESC para salir, C continuar sin paginacion...")
+                        z = ord(getch())
+                        if z == 67 or z == 99:
+                            paginar = False
+                        if z == 27:
+                            break
+                    print(archivo.filename)
+        if z == 27:
+            break
+
+
 def main(argv):
 
-    columnas, filas = get_windows_terminal()
+    
     origen = ''
     buscar = ''
-    paginar = True
+
+    global z
+    global numArchivos 
+    global numZip 
+    global paginar
     try:
         opts, args = getopt.getopt(argv,"hso:b:")
     except getopt.GetoptError:
@@ -76,29 +115,11 @@ def main(argv):
     numArchivos = 0
     numZip = 0
 
+    listaArchivos(buscar,os.path.join(origen))
     for (root,dirs,files) in os.walk(os.path.join(origen)):
         for dir in dirs:
-            archBuscar = sorted(os.listdir( os.path.join(root,dir) ))
-            zipArchivos = filter(isZip,archBuscar)
-            for zipArchivo in zipArchivos:
-                cont = 0
-                numZip += 1
-                with zipfile.ZipFile(os.path.join(os.path.join(root,dir),zipArchivo)) as esteZip:
-                    for archivo in esteZip.filelist:
-                        if buscar in archivo.filename:
-                            numArchivos += 1
-                            cont += 1
-                            if paginar and cont == filas - 1:
-                                cont = 1
-                                print("presione una tecla para continuar, ESC para salir, C continuar sin paginacion...")
-                                z = ord(getch())
-                                if z == 67 or z == 99:
-                                    paginar = False
-                                if z == 27:
-                                    break
-                            print(archivo.filename)
-                if z == 27:
-                    break
+            listaArchivos(buscar,os.path.join(root,dir))
+            
     print("\nArchivos ZIP: " + str(numZip))
     print("Encontrados: " + str(numArchivos))
 

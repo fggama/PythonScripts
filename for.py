@@ -49,6 +49,7 @@ txns = [1.09, 23.56, 57.84, 4.56, 6.78]
 TAX_RATE = .08
 def get_price_with_tax(txn):
     return txn * (1 + TAX_RATE)
+
 final_prices = map(get_price_with_tax, txns)  # return map object
 list(final_prices)
 
@@ -87,4 +88,10 @@ matrix = [[i for i in range(5)] for _ in range(6)]
 
 # generator
 sum(i * i for i in range(1000000000))
+
+# otros
+for c in cities["Metropolitan area"].to_list():
+    if c in "Montreal Canadiens*":
+        print(c)
+
 

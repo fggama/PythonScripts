@@ -17,11 +17,15 @@ Pandas DataFrames, ejemplos de manipulación de datos
 Resumen y ejemplos de iteradores
 ```
  
- ## email_attach.py
+## email_attach.py
 ```
 Descarga archivos adjuntos de los mensajes de Correo Electrónico de un remitente especifico.
 ```
 
+## hashing.py
+```
+Busca los archivos con el nombre del archivo especificado en sus sub-directorios y calcula los numeros Hash.
+```
 ---
 ### Meta
 

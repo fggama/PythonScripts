@@ -1,0 +1,6 @@
+# Directorio Origen, Directorio Destino disco actual, Ignorar
+E:\Documentos\EPSAS,Documentos\EPSAS,[Adjuntos ATC,Dpto. Sistemas,RRHH-Asistencia_backup_2021_02_09_021500_9763520.bak,RRHH-Asistencia_backup_2021_02_09_021500_9763520.rar]
+E:\Documentos\EPSAS\Dpto. Sistemas, Documentos\EPSAS\Dpto. Sistemas,[Software]
+E:\Documentos\VS Proyectos,Documentos\VS Proyectos,[]
+C:\Users\garciafr\source\repos,repos,[]
+

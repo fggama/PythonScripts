@@ -2,12 +2,10 @@ import getopt
 import sys
 import os
 import hashlib
-import _pickle as cPickle
+import pickle as cPickle
 import zipfile
 from datetime import datetime
 from pathlib import Path
-import subprocess, time
-import glob
 from msvcrt import getch
 
 timestampStr = datetime.now().strftime("%Y-%m-%d_%H-%M")
@@ -16,13 +14,16 @@ versionZIP = 0
 infoExt = False
 key = 0
 paginar = True
+filas = 25
+columnas = 80
 
-def copiar(origen,destino,directorios):
+def copiar(origen, destino, ignorar):
     """Ejecuta la copia: origen -> destino"""
     dict={}
 
     destino.mkdir(parents=True, exist_ok=True)
-    print(f'{origen}->{destino.absolute()}')
+    print(f'[+] {origen}->{destino.absolute()}')
+    print(f'\t{ignorar}')
     zipZero = True
  
     os.chdir(destino)
@@ -43,7 +44,7 @@ def copiar(origen,destino,directorios):
                 try:
                     rem.write(f'{k}\n')
                 except:
-                    print(f'{k}\n')
+                    print(f'[-] {k}\n')
 
                 del dict[k]
 
@@ -58,11 +59,15 @@ def copiar(origen,destino,directorios):
     copiados = 0
     for (root,dirs,files) in os.walk(origen):
         if os.path.dirname(root) == os.path.dirname(origen):
-            dirs[:] = [d for d in dirs if d not in directorios]
+            dirs[:] = [d for d in dirs if d not in ignorar]
+
         for archivo in files:
+            if archivo in ignorar:
+                continue
+
             cont += 1
-            archParaZip = Path(root) / Path(archivo)
-            progreso(num,cont,archParaZip)
+            archParaZip = os.path.join(root, archivo)
+            progreso(num, cont, str(archParaZip))
             setArchivoActual(archParaZip)
             f_temp = open(archParaZip,'rb')
             content = f_temp.read()
@@ -74,7 +79,7 @@ def copiar(origen,destino,directorios):
             try:
                 if(dict[archParaZip] != m.hexdigest()):
                     zipZero = False
-                    delta.write(archParaZip, os.path.join(setDir(root,origen),archivo))
+                    delta.write(archParaZip, os.path.join(setDir(root, origen), archivo))
                     dict[archParaZip] = m.hexdigest()
                     copiados += 1
                 else:
@@ -82,19 +87,19 @@ def copiar(origen,destino,directorios):
 
             except KeyError:
                 zipZero = False
-                delta.write(archParaZip, os.path.join(setDir(root,origen),archivo))
+                delta.write(archParaZip, os.path.join(setDir(root, origen),archivo))
                 dict[archParaZip] = m.hexdigest()
                 copiados += 1
     
     delta.close()
     ignore.close()
-    setArchivoActual(os.path.join(destino,"chksm.txt"))
+    setArchivoActual(os.path.join(destino, "chksm.txt"))
     with  open("chksm.txt",mode='wb') as checksum:
         cPickle.dump(dict,checksum)
 
     if cont < num and cont > 0:
         progreso(num,num,'')
-    print(f"# archivos copiados: {copiados}\n")
+    print(f"[+] # archivos copiados: {copiados}\n")
     
     deltazip = Path("delta.zip")
     if zipZero:
@@ -106,6 +111,7 @@ def copiar(origen,destino,directorios):
         deltazip.rename(Path(f"{timestampStr}.zip"))
 
 def setDir(root, dir_origen):
+    """ Direccion absoluta o relativa """
     if versionZIP == 1:
         return root.replace(str(dir_origen),"")
     else:
@@ -113,22 +119,25 @@ def setDir(root, dir_origen):
 
 def progreso(total, i, archivo):
     """Despliega el progreso de la ejecución"""
+    global columnas
     try:
         incre = int(50.0 / total * i)
-        nombre = str(archivo)
-        espacios = 100 - len(nombre)
+        archivo.replace("\n","")
+        espacios = columnas - len(archivo) - 20
         if espacios < 0:
             espacios = 0
-            nombre = nombre[:100]
+            archivo = archivo[:columnas - 20]
 
         if i < total:
-            sys.stdout.write('\r' + '| %d%%  |%s' % (2*incre,' '*5 + nombre + ' '*espacios))
+            print('\r| %d%%  |%s' % (2*incre, ' '*5 + archivo + ' '*espacios), end="\r")
+            # print('\r| %d%%  |%s' % (2*incre, ' '*5 + archivo), end="\r")
+            # sys.stdout.write('\r' + '| %d%%  |%s' % (2*incre,' '*5 + archivo + ' '*espacios),)
         else:
-            sys.stdout.write('\r' + '|%d%%  |%s' % (100,' '*5 + 'Finalizado' + ' '*90))
+            sys.stdout.write('\r|%d%%  |%s' % (100,' '*5 + 'Finalizado' + ' '*90))
             sys.stdout.write('\n')
-            print(f'# archivos procesados: {total}')
+            print(f'[+] # archivos procesados: {total}')
     except:
-        print("Info:", sys.exc_info())
+        print("[-] Info:", str(sys.exc_info()))
         
     sys.stdout.flush()
 
@@ -142,12 +151,11 @@ def listaArchivos(destino, nivel):
     global numArchivos
     global paginar
     cont = 0
-    columnas, filas = get_windows_terminal()
     dirname = ''
     zipArchivos = Path(destino).glob("*.zip")
 
     for zipArchivo in [x for x in zipArchivos if x.is_file()]:
-        print(f"Archivo: {zipArchivo}")
+        print(f"[*] Archivo: {zipArchivo}")
         with zipfile.ZipFile(zipArchivo) as esteZip:
             dict = {}
             for name in esteZip.namelist():
@@ -196,15 +204,15 @@ def get_windows_terminal():
     csbi = create_string_buffer(22)
     res = windll.kernel32.GetConsoleScreenBufferInfo(h, csbi)
  
-    if not res: return 80, 25 
+    if not res: return 
  
     import struct
-    (bufx, bufy, curx, cury, wattr, left, top, right, bottom, maxx, maxy)\
-    = struct.unpack("hhhhHhhhhhh", csbi.raw)
-    width = right - left + 1
-    height = bottom - top + 1
- 
-    return width, height
+    (bufx, bufy, curx, cury, wattr, left, top, right, bottom, maxx, maxy) = struct.unpack("hhhhHhhhhhh", csbi.raw)
+    global columnas 
+    columnas = right - left + 1
+    global filas
+    filas = bottom - top + 1
+    return
 
 def printInstrucciones():
      print ('\tusar: CopiaArchivos.py -d <archivo de detalle> [-a] [-l <nivel>]')
@@ -219,18 +227,20 @@ def printInstrucciones():
      print ('  ej:   CopiaArchivos.py -d detalle.txt [-a] [-l <nivel>]')
 
 def main(argv):
-    archiDetalle = ""
+    archiDetalle = "detalle-epsas.txt"
     nivel = ""
     
     global versionZIP
     global infoExt
+    global columnas, filas
 
     try:
         opts, args = getopt.getopt(argv,"haid:l:")
     except getopt.GetoptError:
-        print ('Error:')
+        print ('[-] Error vea las instrucciones.')
         printInstrucciones()
         sys.exit(2)
+    
     for opt, arg in opts:
         if opt == '-h':
             printInstrucciones()
@@ -247,31 +257,38 @@ def main(argv):
     if len(archiDetalle) == 0:
         printInstrucciones()
         sys.exit(2)
-        
+    
+    size = os.get_terminal_size()
+    filas = size.lines
+    columnas = size.columns
+
+    # get_windows_terminal()
     origen = ""
     destino = ""
+    ignorar = []
     try:
         raizBackup = Path(Path.cwd())
-        print(f"\nDirectorio actual: {Path.cwd()}\n")
+        print(f"\n[+] Directorio actual: {Path.cwd()}\n")
         if not Path(archiDetalle).exists():
-            raise Exception(f'No se encuentra el archivo {archiDetalle}')
+            raise Exception(f'[-] No se encuentra el archivo {archiDetalle}')
     
         archiDetalle = Path(archiDetalle)
         setArchivoActual(archiDetalle)
         detalle = Path(archiDetalle).read_text()
-        for linea in detalle.split('\n'):
+        lista = detalle.split('\n')
+        cont = 0
+        for linea in lista:
             if len(linea) <= 1 or linea.startswith("#") or ',' not in linea:
                 continue
     
-            dirs = linea.replace('/','\\').rstrip().split(",")
-            if (len(dirs) < 2):
+            dirs = linea.replace('/','\\').replace('[','').replace(']','').rstrip().split(",")
+            if (len(dirs) < 3):
                 continue
   
-            origen = Path(dirs[0])
-            dirs.pop(0)
-            destino = Path(dirs[0])
-            dirs.pop(0)
-
+            cont +=1
+            origen = Path(dirs[0].strip())
+            destino = Path(dirs[1].strip())
+            ignorar = dirs[2:]
         
             if len(nivel) > 0:
                 listaArchivos(destino, int(nivel))
@@ -279,21 +296,22 @@ def main(argv):
                     break
             else:
                 if not origen.is_dir():
-                    print(f"No existe el directorio origen: {origen} (ignorado)")
+                    print(f"[-] No existe el directorio origen: {origen} (ignorado)")
                 else:
-                    copiar(origen,destino,dirs)
+                    print(f"{cont}/{len(lista)}")
+                    copiar(origen, destino, ignorar)
 
             os.chdir(raizBackup)
 
         if len(nivel) == 0:
-            print("Copia Finalizada!")
+            print("[+] Copia Finalizada!")
     except:
-        print("")
-        print("Detalle del proceso ")
-        print(f"   origen: {origen}")
-        print(f"  destino: {destino}")
-        print(f"  archivo: {archivoActual}")
-        print("Info:", sys.exc_info())
+        print("[-] Exception")
+        print("\tDetalle del proceso ")
+        print(f"\t   origen: {origen}")
+        print(f"\t  destino: {destino}")
+        print(f"\t  archivo: {archivoActual}")
+        print("\tInfo:", str(sys.exc_info()))
 
 
 if __name__ == "__main__":

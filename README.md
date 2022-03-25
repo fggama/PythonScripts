@@ -1,5 +1,5 @@
 # Notas y Python Scripts
-> Programas y scripts en Python, de uso diario y ejemplos utiles
+> Programas y scripts en Python, de uso diario y otros ejemplos utiles
 
 ## Copias incrementales
 * Backup Incremental de Archivos (CopiaArchivos.py)
